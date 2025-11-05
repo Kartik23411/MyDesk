@@ -4,9 +4,11 @@ import struct
 import time
 import select
 from pynput.mouse import Controller as MouseController
+import cv2
+import numpy as np
 
-# HOST = "192.168.1.115"  # ip address of the server
-HOST = "localhost"
+HOST = "192.168.1.115"  # ip address of the server
+# HOST = "localhost"
 PORT = 6000  
 
 MSG_SCREENSHOT = 0x01
@@ -68,8 +70,17 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as serversocket:
                         except Exception as e:
                             print(f"Error receiving control event: {e}")
                     
-                    metadata = struct.pack("III", sct_img.width, sct_img.height, len(sct_img.raw))
-                    payload = metadata + sct_img.raw
+                    img_array = np.frombuffer(sct_img.raw, dtype="uint8")
+                    img_array = img_array.reshape(sct_img.height, sct_img.width, 4) 
+
+                    img_bgr = cv2.cvtColor(img_array, cv2.COLOR_BGRA2BGR)
+
+                    encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 75]
+                    _, jpeg_data = cv2.imencode('.jpg', img_bgr, encode_param)
+                    jpeg_bytes = jpeg_data.tobytes()
+
+                    metadata = struct.pack("III", sct_img.width, sct_img.height, len(jpeg_bytes))
+                    payload = metadata + jpeg_bytes
 
                     try: 
                         send_message(conn, MSG_SCREENSHOT, payload)
