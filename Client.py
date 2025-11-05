@@ -13,6 +13,9 @@ MSG_MOUSE_CLICK = 0x03
 MSG_KEY_PRESS = 0x04
 MSG_SCROLL = 0x05
 
+screen_width=0
+screen_height=0
+
 # helper function to receivce data of exact length
 def recv_exact(sock, n):
     data = b''
@@ -36,9 +39,24 @@ def recv_message(sock):
     payload = recv_exact(sock, payload_len)
     return (msg_type, payload)
 
+def mouse_callback(event, x, y, flags, param):
+    global screen_width, screen_height
+    if event == cv2.EVENT_MOUSEMOVE:
+        if screen_height>0 and screen_width>0:
+            server_x = int(x)
+            server_y = int(y)
+            payload = struct.pack("!II", server_x, server_y)
+            try: 
+                send_message(param, MSG_MOUSE_MOVE, payload)
+            except:
+                pass
+
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as clientsocket:
     clientsocket.connect((HOST, PORT))
     print("Connected to the sever")
+
+    cv2.namedWindow("Screen")
+    cv2.setMouseCallback("Screen", mouse_callback, clientsocket)
     
     while True: 
         msg_type, payload = recv_message(clientsocket)
@@ -47,6 +65,9 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as clientsocket:
             metadata = payload[:12]
             width, height, data_size = struct.unpack("III", metadata)
             raw_data = payload[12:]
+
+            screen_width=width
+            screen_height=height
             
             img_array = np.frombuffer(raw_data, dtype=np.uint8)
             img_array = img_array.reshape(height, width, 4)

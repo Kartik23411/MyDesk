@@ -2,8 +2,11 @@ import socket
 import mss
 import struct
 import time
+import select
+from pynput.mouse import Controller as MouseController
 
-HOST = "192.168.1.115"  # ip address of the server
+# HOST = "192.168.1.115"  # ip address of the server
+HOST = "localhost"
 PORT = 6000  
 
 MSG_SCREENSHOT = 0x01
@@ -45,6 +48,8 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as serversocket:
             conn, addr = serversocket.accept()
             print(f"Client connected on {addr}")
 
+            mouse = MouseController()
+
             with mss.mss(with_cursor=True) as sct:
                 while True:
                     sct_img = sct.grab(sct.monitors[1])
@@ -52,8 +57,18 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as serversocket:
                     # print(f"the length of the screenshot {len(sct_img.raw)}")
 
                     # packing the width, height and data length integers in a struct so that data of only valid length is accepted
+
+                    readable, _, _ = select.select([conn], [], [], 0)
+                    if readable:
+                        try:
+                            msg_type, payload = recv_message(conn)
+                            if msg_type == MSG_MOUSE_MOVE:
+                                x, y = struct.unpack('!II', payload)
+                                mouse.position = (x, y)
+                        except Exception as e:
+                            print(f"Error receiving control event: {e}")
+                    
                     metadata = struct.pack("III", sct_img.width, sct_img.height, len(sct_img.raw))
-              
                     payload = metadata + sct_img.raw
 
                     try: 
@@ -62,6 +77,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as serversocket:
                     except (BrokenPipeError, ConnectionResetError):
                         print("[[Client Disconnected]] Waiting for other ....")
                         break
+                        
         except (BrokenPipeError, ConnectionResetError):
             print("Client Disconnected")
         except KeyboardInterrupt:
