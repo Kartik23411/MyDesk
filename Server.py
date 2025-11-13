@@ -3,7 +3,8 @@ import mss
 import struct
 import time
 import select
-from pynput.mouse import Controller as MouseController
+from pynput.mouse import Controller as MouseController, Button
+from pynput.keyboard import Controller as KeyboardController, Key
 import cv2
 import numpy as np
 
@@ -51,6 +52,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as serversocket:
             print(f"Client connected on {addr}")
 
             mouse = MouseController()
+            keyboard = KeyboardController()
 
             with mss.mss(with_cursor=True) as sct:
                 while True:
@@ -64,9 +66,38 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as serversocket:
                     if readable:
                         try:
                             msg_type, payload = recv_message(conn)
+
                             if msg_type == MSG_MOUSE_MOVE:
                                 x, y = struct.unpack('!II', payload)
                                 mouse.position = (x, y)
+
+                            elif msg_type == MSG_MOUSE_CLICK:
+                                button, action, x, y = struct.unpack("!BBII", payload)
+                                mouse.position = (x, y)
+                                match button:
+                                    case 1: button_obj = Button.left
+                                    case 2: button_obj = Button.right
+                                    case 3: button_obj = Button.middle
+                                    case _: raise IOError("Invalid button")
+
+                                if(action == 1):
+                                    mouse.press(button_obj)
+                                else: 
+                                    mouse.release(button_obj)
+
+                            elif msg_type == MSG_KEY_PRESS:
+                                key_str = payload.decode('utf-8')
+                                if(len(key_str) == 1):
+                                    keyboard.type(key_str)
+                                else:
+                                    try:
+                                        key_attr = getattr(Key, key_str)
+                                        keyboard.press(key_attr)
+                                        keyboard.release(key_attr)
+                                    except:
+                                        print("Invalid key pressed")
+
+
                         except Exception as e:
                             print(f"Error receiving control event: {e}")
                     
