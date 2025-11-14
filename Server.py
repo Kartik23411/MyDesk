@@ -8,37 +8,15 @@ from pynput.keyboard import Controller as KeyboardController, Key
 import cv2
 import numpy as np
 
+from common.protocol import recv_exact, send_message, recv_message
+from common.constants import (
+    MSG_SCREENSHOT, MSG_MOUSE_MOVE, MSG_MOUSE_CLICK, 
+    MSG_KEY_PRESS, MSG_SCROLL
+)
+
 HOST = "192.168.1.115"  # ip address of the server
 # HOST = "localhost"
-PORT = 6000  
-
-MSG_SCREENSHOT = 0x01
-MSG_MOUSE_MOVE = 0x02
-MSG_MOUSE_CLICK = 0x03
-MSG_KEY_PRESS = 0x04
-MSG_SCROLL = 0x05
-
-def recv_exact(sock, n):
-    data = b''
-    while len(data) < n:
-        chunk = sock.recv(n - len(data))
-        if not chunk:
-            raise ConnectionError("Connection Closed")
-        data += chunk
-    return data
-
-# function to send header and payload
-def send_message(sock, message_type, payload):
-    header = struct.pack("!BI", message_type, len(payload))
-    sock.sendall(header)
-    sock.sendall(payload)
-
-# function to receive message type and payload
-def recv_message(sock):
-    header = recv_exact(sock, 5)
-    msg_type, payload_len = struct.unpack("!BI", header)
-    payload = recv_exact(sock, payload_len)
-    return (msg_type, payload)
+PORT = 6000
 
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as serversocket: 
     serversocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
