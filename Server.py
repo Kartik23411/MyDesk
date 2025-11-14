@@ -97,6 +97,12 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as serversocket:
                                     except:
                                         print("Invalid key pressed")
 
+                            elif msg_type == MSG_SCROLL:
+                                x, y, delta = struct.unpack("!IIi", payload)
+                                mouse.position = (x, y)
+                                print(f"Scroll received: x={x}, y={y}, delta={delta}")
+                                mouse.scroll(0, delta)
+
 
                         except Exception as e:
                             print(f"Error receiving control event: {e}")
@@ -115,7 +121,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as serversocket:
 
                     try: 
                         send_message(conn, MSG_SCREENSHOT, payload)
-                        time.sleep(.03)
+                        time.sleep(.015)
                     except (BrokenPipeError, ConnectionResetError):
                         print("[[Client Disconnected]] Waiting for other ....")
                         break

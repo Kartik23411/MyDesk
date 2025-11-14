@@ -103,6 +103,18 @@ def mouse_callback(event, x, y, flags, param):
             except:
                 pass
 
+        elif event == cv2.EVENT_MOUSEWHEEL:
+            if flags>0:
+                scroll_delta = 1
+            else:
+                scroll_delta = -1
+            print(f"Scroll detected! Delta: {scroll_delta}") 
+            payload = struct.pack('!IIi', server_x, server_y, scroll_delta)
+            try:
+                send_message(param, MSG_SCROLL, payload)
+            except:
+                pass
+
         
 def getscreen_size():
     with mss() as sct:
