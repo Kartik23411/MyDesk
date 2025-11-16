@@ -5,10 +5,10 @@ class MouseController:
         self.mouse = PynputMouseController()
 
     def move(self, x, y):
-        self.mouse.position(x, y)
+        self.mouse.position = (x, y)
 
     def click(self, x, y, button, action):
-        self.mouse.position(x, y)
+        self.mouse.position = (x, y)
 
         match button:
             case 1: button_obj = Button.left
@@ -19,7 +19,7 @@ class MouseController:
         if(action == 1):
             self.mouse.press(button_obj)
         else: 
-            self.ouse.release(button_obj)
+            self.mouse.release(button_obj)
 
     def scroll(self, x, y, delta):
         self.mouse.position = (x, y)
