@@ -1,12 +1,15 @@
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QLabel, QPushButton, QLineEdit, QRadioButton,
-    QButtonGroup, QFrame, QStatusBar, QMenuBar, QMenu, QMessageBox
+    QButtonGroup, QFrame, QStatusBar, QMenuBar, QMenu, QMessageBox, QDialog
 )
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtGui import QImage, QPixmap, QAction, QFont
 import cv2
 import numpy as np
+from client.gui.pin_dialog import PinSetupDialog, PinVerifyDialog
+from common.config_manager import ConfigManager
+from PySide6.QtWidgets import QApplication
 
 class MainWindow(QMainWindow):
 
@@ -18,10 +21,13 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.current_mode = "host"  # setting the host as default mode
+        self.config_manager = None
         self.setup_ui()
         
         # Connect signals
         self.frame_received.connect(self.update_frame)
+        # Initialize config manaaer
+        self.initialize_conig()
 
     # to initialize the UI
     def setup_ui(self):
@@ -217,18 +223,35 @@ class MainWindow(QMainWindow):
         )
         
     def on_connect_clicked(self):
-        address = self.address_input.text().strip()
+        address = self.address_input.text().strip().upper()
         if not address:
             QMessageBox.warning(self, "Invalid Address", "Please enter a remote address.")
             return
             
-        self.connect_requested.emit(address)
+        from common.address_generator import validate_address_format
+        if not validate_address_format(address):
+            QMessageBox.warning(
+                self,
+                "Invalid Address",
+                "Invalid address format.\n\n"
+                "Address should be in format: XXXXX-XXX-XXXX"
+            )
+            return
+        
+        pin_dialog = PinVerifyDialog(address, self)
+        if pin_dialog.exec()==QDialog.Accepted:
+            pin = pin_dialog.get_pin()
+            self.connect_requested.emit(f"{address}:{pin}")
+        else:
+            print("Connection Cancelled")
         
     def set_address(self, address):
         self.address_display.setText(address)
         
     def copy_address(self):
         # TODO: Implement clipboard copy
+        clipboard = QApplication.clipboard()
+        clipboard.setText(self.address_display.text())
         QMessageBox.information(self, "Copied", "Address copied to clipboard!")
         
     @Slot(np.ndarray)
@@ -271,3 +294,30 @@ class MainWindow(QMainWindow):
             "MyDesk Remote Desktop\nVersion 1.0 (MVP)\n\n"
             "A cross-platform remote desktop application."
         )
+
+    def initialize_conig(self):
+        self.config_manager=ConfigManager()
+        address = self.config_manager.get_or_create_address()
+        self.set_address(address)
+
+        if not self.config_manager.has_pin():
+            pin_dialog = PinSetupDialog(self)
+            if pin_dialog.exec()==QDialog.Accepted:
+                pin = pin_dialog.get_pin()
+                self.config_manager.set_pin(pin)
+                QMessageBox.information(
+                    self,
+                    "PIN Set",
+                    f"Your PIN has been set successfully!\n\n"
+                    f"Your Address: {address}\n\n"
+                    f"Share this address with others to let them connect to your computer."
+                )
+            else:
+                QMessageBox.warning(
+                    self,
+                    "PIN Required",
+                    "A PIN is required to use MyDesk. Please set a PIN to continue."
+                )
+                self.close()
+                return
+        return True
