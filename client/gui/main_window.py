@@ -360,6 +360,13 @@ class MainWindow(QMainWindow):
         
     def on_connection_lost(self):
         self.update_connection_status("Disconnected", "#F44336")
+
+        self.display_label.clear()
+        self.display_label.setText(
+            "Connection lost..." if self.current_mode == "viewer" 
+            else "Waiting for connection..."
+        )  
+
         if self.current_mode == "host":
             self.host_status_label.setText("Status: ● Waiting for connection...")
             self.host_status_label.setStyleSheet("QLabel { color: #FF9800; }")
@@ -388,9 +395,19 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         # Stop controller
         if self.controller:
-            asyncio.create_task(self.controller.stop())
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.ensure_future(self.controller.stop())
+        
+        # Stop keyboard listener if exists
+        if hasattr(self, 'keyboard_handler') and self.keyboard_handler:
+            self.keyboard_handler.stop()
         
         event.accept()
+        
+        # Force quit after a short delay
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance().quit()
 
     def start_server_delayed(self):
         if self.current_mode == "host":
