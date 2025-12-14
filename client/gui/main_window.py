@@ -371,11 +371,11 @@ class MainWindow(QMainWindow):
     def on_mode_changed_controller(self, mode):
         if mode == "host":
             # Start server
-            self.controller.start_host_mode()
+            QTimer.singleShot(100, self.controller.start_host_mode)
         elif mode == "viewer":
             # Stop any existing connections when switching to viewer
-            if self.controller.server:
-                asyncio.create_task(self.controller.client.disconnect()) # chnge done
+            if self.controller.client and self.controller.client.is_connected:
+                asyncio.create_task(self.controller.client.disconnect())# chnge done
 
     def on_disconnect_clicked(self):
         asyncio.create_task(self.controller.stop())
