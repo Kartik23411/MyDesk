@@ -1,0 +1,25 @@
+Mode changed to: viewer
+Mode changed to: host
+DEBUG: start_host_mode called
+DEBUG: Creating server on port 6000
+DEBUG: Server task created
+DEBUG: AsyncServer.start() called
+Server started on ('0.0.0.0', 6000)
+Client connected: ('127.0.0.1', 44894)
+Error receiving control events a bytes-like object is required, not 'coroutine'
+Error receiving control events a bytes-like object is required, not 'coroutine'
+Error receiving control events a bytes-like object is required, not 'coroutine'
+Error receiving control events a bytes-like object is required, not 'coroutine'
+Error receiving control events a bytes-like object is required, not 'coroutine'
+Error receiving control events a bytes-like object is required, not 'coroutine'
+Error receiving control events a bytes-like object is required, not 'coroutine'
+Error receiving control events a bytes-like object is required, not 'coroutine'
+Error receiving control events a bytes-like object is required, not 'coroutine'
+Error receiving control events a bytes-like object is required, not 'coroutine'
+Error receiving control events a bytes-like object is required, not 'coroutine'
+Error receiving control events a bytes-like object is required, not 'coroutine'
+Error receiving control events a bytes-like object is required, not 'coroutine'
+Error receiving control events a bytes-like object is required, not 'coroutine'
+Error receiving control events a bytes-like object is required, not 'coroutine'
+Error receiving control events a bytes-like object is required, not 'coroutine'
+Error receiving control events a bytes-like object is required, not 'coroutine'

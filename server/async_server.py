@@ -24,16 +24,32 @@ class AsyncServer:
         self.keyboar_ctrl = KeyboardController()
         self.screen_capture = None
 
+    # async def start(self):
+    #     self.server = await asyncio.start_server(
+    #         self.handle_client,
+    #         self.host,
+    #         self.port
+    #     )
+    #     self.is_running = True
+    #     addr = self.server.sockets[0].getsockname()
+    #     print(f"Server running on {addr}")
+
+    #     async with self.server:
+    #         await self.server.serve_forever()
+
     async def start(self):
+        print("DEBUG: AsyncServer.start() called")  # ADD THIS
+        
         self.server = await asyncio.start_server(
             self.handle_client,
             self.host,
             self.port
         )
+        
         self.is_running = True
         addr = self.server.sockets[0].getsockname()
-        print(f"Server running on {addr}")
-
+        print(f"Server started on {addr}")
+        
         async with self.server:
             await self.server.serve_forever()
     
@@ -41,7 +57,7 @@ class AsyncServer:
         self.is_running = False
         if self.server:
             self.server.close()
-            self.server.wait_closed()
+            await self.server.wait_closed()
 
     async def handle_client(self, reader, writer):
         addr = writer.get_extra_info('peername')
@@ -93,10 +109,10 @@ class AsyncServer:
     async def receive_control_events(self, reader):
         while self.is_running:
             try:
-                header = reader.readexactly(5)
+                header = await reader.readexactly(5)
                 msg_type, payload_len = struct.unpack("!BI", header)
 
-                payload = reader.readexactly(payload_len)
+                payload = await reader.readexactly(payload_len)
                 self.handle_control_events(msg_type, payload)
             except asyncio.IncompleteReadError:
                 break #Connection Closed

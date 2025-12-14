@@ -23,22 +23,51 @@ class AppController(QObject):
         self.server_task=None
         self.client_task=None
 
-    def start_host_mode(self, on_frame_callback=None):
+    # def start_host_mode(self, on_frame_callback=None):
         
-        if self.server_task and self.server_task.done():
+    #     if self.server_task and self.server_task.done():
+    #         print("Server already running")
+    #         return
+        
+    #     self.current_mode = 'host'
+    #     self.status_update.emit("Server Starting...")
+    #     pin_hash=None
+        
+    #     if self.config_manager.has_pin():
+    #         # TODO To be Implemented
+    #         pass
+
+    #     self.server = AsyncServer(host="0.0.0.0", port="6000", pin_hash=pin_hash)
+    #     self.server_task = asyncio.create_task(self._run_server())
+    #     self.status_update.emit("Server started - Waiting for connections...")
+
+    def start_host_mode(self, on_frame_callback=None):
+
+        print("DEBUG: start_host_mode called")  # ADD THIS
+        
+        if self.server_task and not self.server_task.done():
             print("Server already running")
             return
         
-        self.current_mode = 'host'
-        self.status_update.emit("Server Starting...")
-        pin_hash=None
+        self.current_mode = "host"
+        self.status_update.emit("Starting server...")
         
+        # Get PIN hash from config
+        pin_hash = None
         if self.config_manager.has_pin():
-            # TODO To be Implemented
+            # Note: We're not using PIN hash yet, will implement in Day 9
             pass
-
-        self.server = AsyncServer(host="0.0.0.0", port="6000", pin_hash=pin_hash)
+        
+        print(f"DEBUG: Creating server on port 6000")  # ADD THIS
+        
+        # Create and start server
+        self.server = AsyncServer(host='0.0.0.0', port=6000, pin_hash=pin_hash)
+        
+        # Create async task
         self.server_task = asyncio.create_task(self._run_server())
+        
+        print("DEBUG: Server task created")  # ADD THIS
+        
         self.status_update.emit("Server started - Waiting for connections...")
 
     def start_viewer_mode(self, remote_address, pin, on_frame_callback):
@@ -63,7 +92,7 @@ class AppController(QObject):
         self.client.disconnected.connect(self.connection_lost.emit)
         self.client.error_occurred.connect(self.error_occurred.emit)
 
-        self.client_task = asyncio.create_task(self._run_client)
+        self.client_task = asyncio.create_task(self._run_client())
 
     async def stop(self):
         self.status_update.emit("Disconnecting...")

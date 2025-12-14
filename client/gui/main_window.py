@@ -3,13 +3,15 @@ from PySide6.QtWidgets import (
     QLabel, QPushButton, QLineEdit, QRadioButton,
     QButtonGroup, QFrame, QStatusBar, QMenuBar, QMenu, QMessageBox, QDialog
 )
-from PySide6.QtCore import Qt, Signal, Slot
+from PySide6.QtCore import Qt, Signal, Slot, QTimer
 from PySide6.QtGui import QImage, QPixmap, QAction, QFont
 import cv2
 import numpy as np
 from client.gui.pin_dialog import PinSetupDialog, PinVerifyDialog
 from common.config_manager import ConfigManager
 from PySide6.QtWidgets import QApplication
+from app.app_controller import AppController
+import asyncio
 
 class MainWindow(QMainWindow):
 
@@ -22,12 +24,14 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.current_mode = "host"  # setting the host as default mode
         self.config_manager = None
+        self.controller = None
         self.setup_ui()
         
         # Connect signals
         self.frame_received.connect(self.update_frame)
         # Initialize config manaaer
-        self.initialize_conig()
+        if self.initialize_config():
+            self.setup_controller() # to setup the controller
 
     # to initialize the UI
     def setup_ui(self):
@@ -241,7 +245,15 @@ class MainWindow(QMainWindow):
         pin_dialog = PinVerifyDialog(address, self)
         if pin_dialog.exec()==QDialog.Accepted:
             pin = pin_dialog.get_pin()
-            self.connect_requested.emit(f"{address}:{pin}")
+
+            # Start viewer mode with controller
+            # Pass frame handler as callback
+            self.controller.start_viewer_mode(address, pin, self.frame_received.emit)
+
+            # Update UI
+            self.connect_btn.setText("Disconnect")
+            self.connect_btn.clicked.disconnect()
+            self.connect_btn.clicked.connect(self.on_disconnect_clicked)
         else:
             print("Connection Cancelled")
         
@@ -295,7 +307,7 @@ class MainWindow(QMainWindow):
             "A cross-platform remote desktop application."
         )
 
-    def initialize_conig(self):
+    def initialize_config(self):
         self.config_manager=ConfigManager()
         address = self.config_manager.get_or_create_address()
         self.set_address(address)
@@ -321,3 +333,65 @@ class MainWindow(QMainWindow):
                 self.close()
                 return
         return True
+    
+    def setup_controller(self):
+        self.controller = AppController()
+
+        # Connect Control Signals to the UI
+        self.controller.connection_estabilished.connect(self.on_connection_established)
+        self.controller.status_update.connect(self.on_status_update)
+        self.controller.connection_lost.connect(self.on_connection_lost)
+        self.controller.error_occurred.connect(self.on_error)
+
+        self.mode_changed.connect(self.on_mode_changed_controller)
+
+        # automate server start on host mode entering
+        if self.current_mode == "host":
+            QTimer.singleShot(100, self.start_server_delayed) #starting after the 100ms of application start
+
+    def on_status_update(self, status):
+        self.status_bar.showMessage(status)
+    
+    def on_connection_established(self, remote_addr):
+        self.update_connection_status("Connected", "#4CAF50")
+        if self.current_mode == "host":
+            self.host_status_label.setText("Status: ● Client connected")
+            self.host_status_label.setStyleSheet("QLabel { color: #4CAF50; }")
+        
+    def on_connection_lost(self):
+        self.update_connection_status("Disconnected", "#F44336")
+        if self.current_mode == "host":
+            self.host_status_label.setText("Status: ● Waiting for connection...")
+            self.host_status_label.setStyleSheet("QLabel { color: #FF9800; }")
+        
+    def on_error(self, error_msg):
+        from PySide6.QtWidgets import QMessageBox
+        QMessageBox.critical(self, "Connection Error", f"Error: {error_msg}")
+        
+    def on_mode_changed_controller(self, mode):
+        if mode == "host":
+            # Start server
+            self.controller.start_host_mode()
+        elif mode == "viewer":
+            # Stop any existing connections when switching to viewer
+            if self.controller.server:
+                asyncio.create_task(self.controller.client.disconnect()) # chnge done
+
+    def on_disconnect_clicked(self):
+        asyncio.create_task(self.controller.stop())
+        
+        # Update UI
+        self.connect_btn.setText("Connect")
+        self.connect_btn.clicked.disconnect()
+        self.connect_btn.clicked.connect(self.on_connect_clicked)
+
+    def closeEvent(self, event):
+        # Stop controller
+        if self.controller:
+            asyncio.create_task(self.controller.stop())
+        
+        event.accept()
+
+    def start_server_delayed(self):
+        if self.current_mode == "host":
+            self.controller.start_host_mode()
