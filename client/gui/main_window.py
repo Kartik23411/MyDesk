@@ -357,6 +357,12 @@ class MainWindow(QMainWindow):
         if self.current_mode == "host":
             self.host_status_label.setText("Status: ● Client connected")
             self.host_status_label.setStyleSheet("QLabel { color: #4CAF50; }")
+
+        elif self.current_mode == "viewer":
+            self.display_label.clear()
+            self.display_label.setText("") 
+            
+            self.status_bar.showMessage(f"Connected to {remote_addr}")
         
     def on_connection_lost(self):
         self.update_connection_status("Disconnected", "#F44336")
@@ -391,6 +397,10 @@ class MainWindow(QMainWindow):
         self.connect_btn.setText("Connect")
         self.connect_btn.clicked.disconnect()
         self.connect_btn.clicked.connect(self.on_connect_clicked)
+
+
+        self.display_label.clear()
+        self.display_label.setText("Enter address to connect...")
 
     def closeEvent(self, event):
         # Stop controller
