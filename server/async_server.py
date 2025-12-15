@@ -60,12 +60,14 @@ class AsyncServer:
             await self.server.wait_closed()
 
     async def handle_client(self, reader, writer):
+        # reader and writer are stream reader and writer objects
+
         addr = writer.get_extra_info('peername')
         print(f"Client connected: {addr}")
         self.client_writer = writer
 
-        self.screen_capture = ScreenCapture(with_cursor=True)
-        self.screen_capture.start()
+        send_task = None
+        recv_task = None
 
         try:
             #TODO Add Pin authentication 
@@ -77,15 +79,33 @@ class AsyncServer:
             send_task = asyncio.create_task(self.send_frames(writer))    
             recv_task = asyncio.create_task(self.receive_control_events(reader))
             # To wait for a task either to finish
-            await asyncio.gather(send_task, recv_task)
+            done, pending = await asyncio.wait(
+                [send_task, recv_task],
+                return_when=asyncio.FIRST_COMPLETED
+            )
+            # Cancel the remanaining task so that server can reconnect freshly
+            for task in pending:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
         except Exception as e:
             print(f"Client handling error: {e}")
+
         finally:
             print(f"Client disconnected: {addr}")
             if self.screen_capture:
-                self.screen_capture.stop()
-            writer.close()
-            await writer.wait_closed()
+                self.screen_capture.stop()  
+                self.screen_capture = None
+            
+            try:
+                writer.close()
+                await writer.wait_closed()
+            except:
+                pass
+
             self.client_writer = None
 
     async def send_frames(self, writer):
@@ -114,10 +134,19 @@ class AsyncServer:
 
                 payload = await reader.readexactly(payload_len)
                 self.handle_control_events(msg_type, payload)
+
             except asyncio.IncompleteReadError:
-                break #Connection Closed
+                print("Client closed connection")
+                break   
+            except ConnectionResetError:
+                print("Connection reset by the client")
+                break
+            except BrokenPipeError:
+                print("Connection broken - Client Disconnected")
+                break
             except Exception as e:
-                print(f"Error receiving control events {e}")
+                print(f"Error receiving control event: {e}")
+                break
 
     def handle_control_events(self, msg_type, payload):
         try:

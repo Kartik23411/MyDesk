@@ -71,9 +71,23 @@ class AppController(QObject):
         self.status_update.emit("Server started - Waiting for connections...")
 
     def start_viewer_mode(self, remote_address, pin, on_frame_callback):
+
+        if self.client:
+        # to disconnect the old signals associated with previous client
+            try:
+                self.client.frame_received.disconnect()
+                self.client.connected.disconnect()
+                self.client.disconnected.disconnect()
+                self.client.error_occurred.disconnect()
+            except:
+                pass  
+        
+        self.client = None
+    
         if self.client_task and not self.client_task.done():
-            print("Client already running")
-            return
+            print("Client task still running, cancelling...")
+            self.client_task.cancel()
+            self.client_task = None
         
         self.current_mode = "viewer"
         
