@@ -58,18 +58,17 @@ class AppController(QObject):
             # Note: We're not using PIN hash yet, will implement in Day 9
             pass
         
-        print(f"DEBUG: Creating server on port 6000")  # ADD THIS
+        print(f"DEBUG: Creating server on port 6000")  
         
         # Create and start server
-        self.server = AsyncServer(host='0.0.0.0', port=6000, pin_hash=pin_hash)
+        self.server = AsyncServer(host='0.0.0.0', port=6000, pin_hash=pin_hash, use_ssl=True)
         
         # Create async task
         self.server_task = asyncio.create_task(self._run_server())
         
-        print("DEBUG: Server task created")  # ADD THIS
+        print("DEBUG: Server task created")  
         
         self.status_update.emit("Server started - Waiting for connections...")
-
     def start_viewer_mode(self, remote_address, pin, on_frame_callback):
 
         if self.client:
@@ -96,7 +95,7 @@ class AppController(QObject):
         remote_host = '127.0.0.1'
         self.status_update.emit(f"Connecting to {remote_address}...")
 
-        self.client=AsyncClient(remote_host, 6000, pin)
+        self.client=AsyncClient(remote_host, 6000, pin, use_ssl=True) 
 
         # Connect Signals
         self.client.frame_received.connect(on_frame_callback)

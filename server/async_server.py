@@ -9,47 +9,40 @@ from common.protocol import send_message, recv_message
 from server.capture.screen_capture import ScreenCapture
 from server.control.keyboard_control import KeyboardController
 from server.control.mouse_control import MouseController
+from common.ssl_helper import SSLHelper
 
 class AsyncServer:
 
-    def __init__(self, host="'0.0.0.0", port=DEFAULT_PORT, pin_hash=None):
+    def __init__(self, host="'0.0.0.0", port=DEFAULT_PORT, pin_hash=None, use_ssl=True):
         self.host = host
         self.port = port
         self.pin_hash = pin_hash
+        self.use_ssl = use_ssl
         self.server = None
         self.is_running = False
         self.client_writer = None
+        # ssl 
+        self.ssl_context = None
+        if self.use_ssl:
+            ssl_helper = SSLHelper()
+            self.ssl_context = ssl_helper.get_server_ssl_context()
         # Controller
         self.mouse_ctrl = MouseController()
         self.keyboar_ctrl = KeyboardController()
         self.screen_capture = None
 
-    # async def start(self):
-    #     self.server = await asyncio.start_server(
-    #         self.handle_client,
-    #         self.host,
-    #         self.port
-    #     )
-    #     self.is_running = True
-    #     addr = self.server.sockets[0].getsockname()
-    #     print(f"Server running on {addr}")
-
-    #     async with self.server:
-    #         await self.server.serve_forever()
-
     async def start(self):
-        print("DEBUG: AsyncServer.start() called")  # ADD THIS
-        
         self.server = await asyncio.start_server(
             self.handle_client,
             self.host,
-            self.port
+            self.port,
+            ssl=self.ssl_context
         )
-        
         self.is_running = True
         addr = self.server.sockets[0].getsockname()
-        print(f"Server started on {addr}")
-        
+        ssl_status = "with SSL" if self.use_ssl else "without SSL"
+        print(f"Server running on {addr} {ssl_status}")
+
         async with self.server:
             await self.server.serve_forever()
     

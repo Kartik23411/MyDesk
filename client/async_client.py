@@ -7,6 +7,7 @@ from common.constants import (
     MSG_SCREENSHOT, MSG_MOUSE_MOVE, MSG_MOUSE_CLICK,
     MSG_KEY_PRESS, MSG_SCROLL, DEFAULT_PORT
 )
+from common.ssl_helper import SSLHelper
 
 class AsyncClient(QObject):
     # Signals for the GUI
@@ -15,24 +16,32 @@ class AsyncClient(QObject):
     disconnected = Signal()
     error_occurred = Signal(str)
 
-    def __init__(self, remote_host, remote_port=DEFAULT_PORT, pin=None):
+    def __init__(self, remote_host, remote_port=DEFAULT_PORT, pin=None, use_ssl=True):
         super().__init__()
         self.remote_host = remote_host
         self.remote_port = remote_port
         self.pin = pin
+        self.use_ssl = use_ssl
         self.reader = None
         self.writer = None
         self.is_connected = False
+
+        self.ssl_context = None
+        if self.use_ssl:
+            ssl_helper = SSLHelper()
+            self.ssl_context = ssl_helper.get_client_ssl_context()
 
     async def connect(self):
         try:
             self.reader, self.writer = await asyncio.open_connection(
                 self.remote_host,
-                self.remote_port
+                self.remote_port,
+                ssl = self.ssl_context
             )
 
             self.is_connected = True
-            print(f"Connected to {self.remote_host}:{self.remote_port}")
+            ssl_status = "with SSL" if self.use_ssl else "without SSL"
+            print(f"Connected to {self.remote_host}:{self.remote_port} {ssl_status}")
             self.connected.emit()
 
             # TODO Add logic to send for the sending of pin authentication
