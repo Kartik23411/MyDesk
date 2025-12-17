@@ -4,7 +4,7 @@ import time
 from turtle import width
 
 from common.constants import (MSG_KEY_PRESS, MSG_MOUSE_CLICK, MSG_MOUSE_MOVE, MSG_SCREENSHOT, MSG_SCROLL,
-                            DEFAULT_PORT, FRAME_DELAY)
+                            DEFAULT_PORT, FRAME_DELAY, MSG_AUTH, MSG_AUTH_SUCCESS, MSG_AUTH_FAIL)
 from common.protocol import send_message, recv_message
 from server.capture.screen_capture import ScreenCapture
 from server.control.keyboard_control import KeyboardController
@@ -13,10 +13,11 @@ from common.ssl_helper import SSLHelper
 
 class AsyncServer:
 
-    def __init__(self, host="'0.0.0.0", port=DEFAULT_PORT, pin_hash=None, use_ssl=True):
+    def __init__(self, host="'0.0.0.0", port=DEFAULT_PORT, config_manager=None, use_ssl=True):
         self.host = host
         self.port = port
-        self.pin_hash = pin_hash
+        # self.pin_hash = pin_hash
+        self.config_manager = config_manager
         self.use_ssl = use_ssl
         self.server = None
         self.is_running = False
@@ -64,6 +65,39 @@ class AsyncServer:
 
         try:
             #TODO Add Pin authentication 
+
+            if self.config_manager and self.config_manager.has_pin():
+                try:
+                    print("DEBUG: PIN Auth Started at the server")
+
+                    header = await reader.readexactly(5)
+                    msg_type, payload_len = struct.unpack("!BI", header)
+
+                    if msg_type != MSG_AUTH:
+                        print("Expecteed Auth message, got wrong message type")
+                        return
+                    
+                    pin_data = await reader.readexactly(payload_len)
+                    client_pin = pin_data.decode('utf-8')
+
+                    print(f"DEBUG: the pin received is {client_pin}")
+
+                    from common.config_manager import ConfigManager
+                    config = ConfigManager()
+
+                    if not config.verify_pin(client_pin):
+                        print(f"Invalid PIN from {addr}")
+                        writer.write(struct.pack("!BI", MSG_AUTH_FAIL, 0))
+                        await writer.drain()
+                        return
+                    
+                    print(f"PIN authenticated on {addr}")
+                    writer.write(struct.pack("!BI", MSG_AUTH_SUCCESS, 0))
+                    await writer.drain()
+
+                except Exception as e:
+                    print(f"Authentication error {e}")
+                    return
 
             # Screen Capture
             self.screen_capture = ScreenCapture(with_cursor=True)

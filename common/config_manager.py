@@ -69,6 +69,9 @@ class ConfigManager:
     def has_pin(self):
         return 'pin_hash' in self.config
     
+    def get_pin(self):
+        return self.config.get('pin_hash')
+    
     def get_address(self):
         return self.config.get('address')
     

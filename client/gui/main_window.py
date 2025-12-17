@@ -358,6 +358,8 @@ class MainWindow(QMainWindow):
             self.host_status_label.setText("Status: ● Client connected")
             self.host_status_label.setStyleSheet("QLabel { color: #4CAF50; }")
 
+            self.status_bar.showMessage(f"Client connected: {remote_addr}")
+
         elif self.current_mode == "viewer":
             self.display_label.clear()
             self.display_label.setText("") 

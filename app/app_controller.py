@@ -23,27 +23,7 @@ class AppController(QObject):
         self.server_task=None
         self.client_task=None
 
-    # def start_host_mode(self, on_frame_callback=None):
-        
-    #     if self.server_task and self.server_task.done():
-    #         print("Server already running")
-    #         return
-        
-    #     self.current_mode = 'host'
-    #     self.status_update.emit("Server Starting...")
-    #     pin_hash=None
-        
-    #     if self.config_manager.has_pin():
-    #         # TODO To be Implemented
-    #         pass
-
-    #     self.server = AsyncServer(host="0.0.0.0", port="6000", pin_hash=pin_hash)
-    #     self.server_task = asyncio.create_task(self._run_server())
-    #     self.status_update.emit("Server started - Waiting for connections...")
-
     def start_host_mode(self, on_frame_callback=None):
-
-        print("DEBUG: start_host_mode called")  # ADD THIS
         
         if self.server_task and not self.server_task.done():
             print("Server already running")
@@ -52,16 +32,8 @@ class AppController(QObject):
         self.current_mode = "host"
         self.status_update.emit("Starting server...")
         
-        # Get PIN hash from config
-        pin_hash = None
-        if self.config_manager.has_pin():
-            # Note: We're not using PIN hash yet, will implement in Day 9
-            pass
-        
-        print(f"DEBUG: Creating server on port 6000")  
-        
         # Create and start server
-        self.server = AsyncServer(host='0.0.0.0', port=6000, pin_hash=pin_hash, use_ssl=True)
+        self.server = AsyncServer(host='0.0.0.0', port=6000, config_manager=self.config_manager, use_ssl=True)
         
         # Create async task
         self.server_task = asyncio.create_task(self._run_server())

@@ -5,7 +5,7 @@ import cv2
 from PySide6.QtCore import QObject, Signal
 from common.constants import (
     MSG_SCREENSHOT, MSG_MOUSE_MOVE, MSG_MOUSE_CLICK,
-    MSG_KEY_PRESS, MSG_SCROLL, DEFAULT_PORT
+    MSG_KEY_PRESS, MSG_SCROLL, DEFAULT_PORT, MSG_AUTH, MSG_AUTH_FAIL, MSG_AUTH_SUCCESS
 )
 from common.ssl_helper import SSLHelper
 
@@ -44,7 +44,33 @@ class AsyncClient(QObject):
             print(f"Connected to {self.remote_host}:{self.remote_port} {ssl_status}")
             self.connected.emit()
 
-            # TODO Add logic to send for the sending of pin authentication
+            if self.pin:
+                try:
+
+                    pin_bytes = self.pin.encode('utf-8')
+                    header = struct.pack("!BI", MSG_AUTH, len(pin_bytes))
+                    self.writer.write(header)
+                    self.writer.write(pin_bytes)
+                    await self.writer.drain()
+
+                    response = await self.reader.readexactly(5)
+                    msg_type, payload_len = struct.unpack("!BI", response)
+
+                    if msg_type == MSG_AUTH_FAIL: 
+                        print("Authentication failed - Invalid PIN")
+                        self.error_occurred.emit("Invalid PIN")
+                        await self.disconnect()
+                        return
+                    elif msg_type == MSG_AUTH_SUCCESS: 
+                        print("Authentication successful")
+                    else:
+                        print(f"Unexpected auth response: {msg_type}")
+
+                except Exception as e:
+                    print(f"Authentication error: {e}")
+                    self.error_occurred.emit(f"Authentication error: {e}")
+                    await self.disconnect()
+                    return
 
             await self.receive_frames()
         except Exception as e:
