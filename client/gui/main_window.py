@@ -250,6 +250,9 @@ class MainWindow(QMainWindow):
             # Pass frame handler as callback
             self.controller.start_viewer_mode(address, pin, self.frame_received.emit)
 
+            # connnecting the fps update signal to client after the client is created
+            QTimer.singleShot(200, lambda: self.connect_fps_signal())
+
             # Update UI
             self.connect_btn.setText("Disconnect")
             self.connect_btn.clicked.disconnect()
@@ -287,8 +290,31 @@ class MainWindow(QMainWindow):
         self.connection_status.setText(f"Connection: {status}")
         self.connection_status.setStyleSheet(f"QLabel {{ color: {color}; }}")
         
+    def connect_fps_signal(self):
+        if self.controller.client:
+            self.controller.client.fps_updated.connect(self.on_fps_updated)
+            print("FPS signal connected")
+
     def update_fps(self, fps):
         self.fps_label.setText(f"FPS: {fps}")
+
+        if fps >= 25:
+            color = "#4CAF50"  # Green - Good
+        elif fps >= 15:
+            color = "#FF9800"  # Orange - OK
+        else:
+            color = "#F44336"  # Red - Poor
+        
+        self.fps_label.setStyleSheet(f"QLabel {{ color: {color}; font-weight: bold; }}")
+
+    @Slot(float)
+    def on_fps_updated(self, fps):
+        self.update_fps(int(fps))
+
+        # using frame delivery time as rough latency
+        if self.controller.client:
+            frame_time_ms = self.controller.client.perf_tracker.get_avg_frame_time_ms()
+            self.update_ping(int(frame_time_ms))
         
     def update_ping(self, ping_ms):
         self.ping_label.setText(f"Ping: {ping_ms}ms")
@@ -303,8 +329,17 @@ class MainWindow(QMainWindow):
         QMessageBox.about(
             self,
             "About MyDesk",
-            "MyDesk Remote Desktop\nVersion 1.0 (MVP)\n\n"
-            "A cross-platform remote desktop application."
+            "MyDesk Remote Desktop\n"
+            "Version 1.0 (MVP)\n\n"
+            "A cross-platform remote desktop application.\n\n"
+            "Keyboard Shortcuts:\n"
+            "• F11 - Toggle Fullscreen\n"
+            "• Q - Quit when viewing\n"
+            "• Ctrl+C - Copy address\n\n"
+            "Features:\n"
+            "• SSL/TLS Encryption ✓\n"
+            "• PIN Authentication ✓\n"
+            "• Real-time Streaming ✓"
         )
 
     def initialize_config(self):
@@ -351,6 +386,8 @@ class MainWindow(QMainWindow):
 
     def on_status_update(self, status):
         self.status_bar.showMessage(status)
+
+        print(f"Status {status}")
     
     def on_connection_established(self, remote_addr):
         self.update_connection_status("Connected", "#4CAF50")
@@ -369,6 +406,9 @@ class MainWindow(QMainWindow):
     def on_connection_lost(self):
         self.update_connection_status("Disconnected", "#F44336")
 
+        self.update_fps(0)
+        self.fps_label.setStyleSheet("")
+
         self.display_label.clear()
         self.display_label.setText(
             "Connection lost..." if self.current_mode == "viewer" 
@@ -383,14 +423,24 @@ class MainWindow(QMainWindow):
         from PySide6.QtWidgets import QMessageBox
         QMessageBox.critical(self, "Connection Error", f"Error: {error_msg}")
         
+    # def on_mode_changed_controller(self, mode):
+    #     if mode == "host":
+    #         # Start server
+    #         QTimer.singleShot(100, self.controller.start_host_mode)
+    #     elif mode == "viewer":
+    #         # Stop any existing connections when switching to viewer
+    #         if self.controller.client and self.controller.client.is_connected:
+    #             asyncio.create_task(self.controller.client.disconnect())# chnge done
+
     def on_mode_changed_controller(self, mode):
         if mode == "host":
-            # Start server
-            QTimer.singleShot(100, self.controller.start_host_mode)
+            # Start server if not running
+            if not self.controller.server or not self.controller.server.is_running:
+                QTimer.singleShot(100, self.controller.start_host_mode)
+            
         elif mode == "viewer":
-            # Stop any existing connections when switching to viewer
-            if self.controller.client and self.controller.client.is_connected:
-                asyncio.create_task(self.controller.client.disconnect())# chnge done
+            # (actual connection happens on Connect button)
+            pass
 
     def on_disconnect_clicked(self):
         asyncio.create_task(self.controller.stop())

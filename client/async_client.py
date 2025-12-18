@@ -8,6 +8,7 @@ from common.constants import (
     MSG_KEY_PRESS, MSG_SCROLL, DEFAULT_PORT, MSG_AUTH, MSG_AUTH_FAIL, MSG_AUTH_SUCCESS
 )
 from common.ssl_helper import SSLHelper
+from common.performance import PerformanceTracker
 
 class AsyncClient(QObject):
     # Signals for the GUI
@@ -15,6 +16,7 @@ class AsyncClient(QObject):
     connected = Signal()
     disconnected = Signal()
     error_occurred = Signal(str)
+    fps_updated=Signal(float)
 
     def __init__(self, remote_host, remote_port=DEFAULT_PORT, pin=None, use_ssl=True):
         super().__init__()
@@ -25,6 +27,8 @@ class AsyncClient(QObject):
         self.reader = None
         self.writer = None
         self.is_connected = False
+        self.perf_tracker = PerformanceTracker()
+        self.fps_timer = None
 
         self.ssl_context = None
         if self.use_ssl:
@@ -86,6 +90,7 @@ class AsyncClient(QObject):
         self.disconnected.emit()
 
     async def receive_frames(self):
+        self.start_fps_updates()
         while self.is_connected:
             try:
                 header = await self.reader.readexactly(5)
@@ -101,6 +106,9 @@ class AsyncClient(QObject):
                     jpeg_array = np.frombuffer(jpeg_data, dtype=np.uint8)
                     img_bgr = cv2.imdecode(jpeg_array, cv2.IMREAD_COLOR)
                     
+                    # record frames
+                    self.perf_tracker.record_frame()
+
                     # Emit frame to GUI
                     if img_bgr is not None:
                         self.frame_received.emit(img_bgr)
@@ -113,6 +121,7 @@ class AsyncClient(QObject):
                 self.error_occurred.emit(str(e))
                 break
                 
+        self.stop_fps_updates()        
         await self.disconnect()
 
     async def send_mouse_move(self, x, y):
@@ -162,6 +171,20 @@ class AsyncClient(QObject):
         except Exception as e:
             print(f"Error sending message: {e}")
             self.error_occurred.emit(str(e))
+
+    def start_fps_updates(self):
+        async def update_fps():
+            while self.is_connected:
+                fps = self.perf_tracker.get_fps()
+                self.fps_updated.emit(fps)
+                await asyncio.sleep(1.0)
+
+        self.fps_timer = asyncio.create_task(update_fps())
+
+    def stop_fps_updates(self):
+        if self.fps_timer:
+            self.fps_timer.cancel()
+            self.fps_timer = None
 
 # Test function
 async def test_client():
