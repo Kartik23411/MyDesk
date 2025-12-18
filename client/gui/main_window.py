@@ -181,9 +181,16 @@ class MainWindow(QMainWindow):
         self.connect_btn.setMinimumWidth(100)
         self.connect_btn.clicked.connect(self.on_connect_clicked)
         
+        self.reconnect_btn = QPushButton("Reconnect")
+        self.reconnect_btn.setMinimumWidth(100)
+        self.reconnect_btn.setStyleSheet("QPushButton { background-color: #4CAF50; color: white; font-weight: bold; }")
+        self.reconnect_btn.clicked.connect(self.on_reconnect_clicked)
+        self.reconnect_btn.hide()
+
         viewer_layout.addWidget(remote_label)
         viewer_layout.addWidget(self.address_input, 1)
         viewer_layout.addWidget(self.connect_btn)
+        viewer_layout.addWidget(self.reconnect_btn)
         
         parent_layout.addWidget(self.viewer_frame)
 
@@ -419,6 +426,13 @@ class MainWindow(QMainWindow):
         elif self.current_mode == "viewer":
             self.display_label.clear()
             self.display_label.setText("") 
+
+            # to hide reconnect and show the disconnect
+            self.reconnect_btn.hide()
+            self.connect_btn.show()
+            self.connect_btn.setText("Disconnect")
+            self.connect_btn.clicked.disconnect()
+            self.connect_btn.clicked.connect(self.on_disconnect_clicked)
             
             self.status_bar.showMessage(f"Connected to {remote_addr}")
         
@@ -437,6 +451,10 @@ class MainWindow(QMainWindow):
             "Connection lost..." if self.current_mode == "viewer" 
             else "Waiting for connection..."
         )  
+
+        if self.current_mode == "viewer":
+            self.connect_btn.hide()
+            self.reconnect_btn.show()
 
         if self.current_mode == "host":
             self.host_status_label.setText("Status: ● Waiting for connection...")
@@ -473,6 +491,9 @@ class MainWindow(QMainWindow):
         self.connect_btn.clicked.disconnect()
         self.connect_btn.clicked.connect(self.on_connect_clicked)
 
+
+        self.connect_btn.hide()
+        self.reconnect_btn.show()
 
         self.display_label.clear()
         self.display_label.setText("Enter address to connect...")
@@ -591,3 +612,8 @@ class MainWindow(QMainWindow):
         )   
 
         QMessageBox.information(self, "Session Info", info_text)
+
+    def on_reconnect_clicked(self):
+        self.on_connect_clicked()
+
+    
