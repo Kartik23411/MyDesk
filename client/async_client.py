@@ -46,6 +46,8 @@ class AsyncClient(QObject):
             self.is_connected = True
             ssl_status = "with SSL" if self.use_ssl else "without SSL"
             print(f"Connected to {self.remote_host}:{self.remote_port} {ssl_status}")
+
+            self.perf_tracker.start_session() # to start the session performance tracking
             self.connected.emit()
 
             if self.pin:
@@ -101,7 +103,8 @@ class AsyncClient(QObject):
                     metadata = payload[:12]  # Extract metadata
                     width, height, data_size = struct.unpack("III", metadata)
                     jpeg_data = payload[12:]
-                    
+
+                    self.perf_tracker.record_data(len(payload))                        
                     # Decode JPEG
                     jpeg_array = np.frombuffer(jpeg_data, dtype=np.uint8)
                     img_bgr = cv2.imdecode(jpeg_array, cv2.IMREAD_COLOR)

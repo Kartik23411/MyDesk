@@ -82,6 +82,13 @@ class MainWindow(QMainWindow):
         fullscreen_action.triggered.connect(self.toggle_fullscreen)
         view_menu.addAction(fullscreen_action)
 
+        view_menu.addSeparator()
+
+        session_info_action = QAction("&Session Info", self)
+        session_info_action.setShortcut("Ctrl+I")
+        session_info_action.triggered.connect(self.show_session_info)
+        view_menu.addAction(session_info_action)
+
         # Help menu
         help_menu = menubar.addMenu("&Help")
         
@@ -542,6 +549,11 @@ class MainWindow(QMainWindow):
                     event.accept()
                     return
                 
+        elif (modifiers & Qt.ControlModifier) and key == Qt.Key_I: #ctrl or cmd i to show session info
+                self.show_session_info()
+                event.accept()
+                return
+                
         elif key == Qt.Key_Escape:
             if self.isFullScreen():
                 self.showNormal()
@@ -549,3 +561,33 @@ class MainWindow(QMainWindow):
                 return
             
         super().keyPressEvent(event)
+
+    def show_session_info(self):
+        if not self.controller.client or not self.controller.client.is_connected:
+            QMessageBox.information(self, "Session Info", "No active session.")
+            return
+        
+        perf = self.controller.client.perf_tracker
+
+        duration = perf.get_session_duration()
+        minutes = int(duration // 60)
+        seconds = int(duration % 60)
+
+        data_mb = perf.get_total_mb_received()
+        bandwidth = perf.get_bandwidth_mbps()
+        fps = perf.get_fps()
+        frame_time = perf.get_avg_frame_time_ms()
+
+        info_text = (
+            f"Session Information\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"Duration: {minutes}m {seconds}s\n"
+            f"Frames Received: {perf.frame_count}\n"
+            f"Data Received: {data_mb:.2f} MB\n"
+            f"Avg Bandwidth: {bandwidth:.2f} Mbps\n\n"
+            f"Performance:\n"
+            f"• Current FPS: {fps:.1f}\n"
+            f"• Frame Time: {frame_time:.1f} ms\n"
+        )   
+
+        QMessageBox.information(self, "Session Info", info_text)
