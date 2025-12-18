@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (
     QButtonGroup, QFrame, QStatusBar, QMenuBar, QMenu, QMessageBox, QDialog
 )
 from PySide6.QtCore import Qt, Signal, Slot, QTimer
-from PySide6.QtGui import QImage, QPixmap, QAction, QFont
+from PySide6.QtGui import QImage, QPixmap, QAction, QFont, QKeySequence
 import cv2
 import numpy as np
 from client.gui.pin_dialog import PinSetupDialog, PinVerifyDialog
@@ -138,6 +138,7 @@ class MainWindow(QMainWindow):
         copy_btn = QPushButton("Copy")
         copy_btn.setMaximumWidth(60)
         copy_btn.clicked.connect(self.copy_address)
+        copy_btn.setToolTip("Copy address (Ctrl+C)")
         
         address_layout.addWidget(address_label)
         address_layout.addWidget(self.address_display)
@@ -196,10 +197,12 @@ class MainWindow(QMainWindow):
         
         # Add permanent widgets
         self.connection_status = QLabel("Connection: None")
+        self.quality_indicator = QLabel("Quality: --")
         self.fps_label = QLabel("FPS: --")
         self.ping_label = QLabel("Ping: --")
         
         self.status_bar.addWidget(self.connection_status)
+        self.status_bar.addPermanentWidget(self.quality_indicator)
         self.status_bar.addPermanentWidget(self.fps_label)
         self.status_bar.addPermanentWidget(self.ping_label)
         
@@ -264,7 +267,6 @@ class MainWindow(QMainWindow):
         self.address_display.setText(address)
         
     def copy_address(self):
-        # TODO: Implement clipboard copy
         clipboard = QApplication.clipboard()
         clipboard.setText(self.address_display.text())
         QMessageBox.information(self, "Copied", "Address copied to clipboard!")
@@ -315,6 +317,8 @@ class MainWindow(QMainWindow):
         if self.controller.client:
             frame_time_ms = self.controller.client.perf_tracker.get_avg_frame_time_ms()
             self.update_ping(int(frame_time_ms))
+
+            self.update_connection_quality(int(fps), int(frame_time_ms))
         
     def update_ping(self, ping_ms):
         self.ping_label.setText(f"Ping: {ping_ms}ms")
@@ -332,14 +336,22 @@ class MainWindow(QMainWindow):
             "MyDesk Remote Desktop\n"
             "Version 1.0 (MVP)\n\n"
             "A cross-platform remote desktop application.\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             "Keyboard Shortcuts:\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             "• F11 - Toggle Fullscreen\n"
-            "• Q - Quit when viewing\n"
-            "• Ctrl+C - Copy address\n\n"
+            "• Ctrl+C - Copy Address (Host mode)\n"
+            "• Ctrl+D - Disconnect\n"
+            "• Ctrl+R - Reconnect\n"
+            "• Esc - Exit Fullscreen\n"
+            "• Q - Quit viewer window\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             "Features:\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             "• SSL/TLS Encryption ✓\n"
             "• PIN Authentication ✓\n"
-            "• Real-time Streaming ✓"
+            "• Real-time Streaming ✓\n"
+            "• Performance Monitoring ✓"
         )
 
     def initialize_config(self):
@@ -407,7 +419,11 @@ class MainWindow(QMainWindow):
         self.update_connection_status("Disconnected", "#F44336")
 
         self.update_fps(0)
+        self.update_ping(0)
         self.fps_label.setStyleSheet("")
+
+        self.quality_indicator.setText("Quality: --")
+        self.quality_indicator.setStyleSheet("")
 
         self.display_label.clear()
         self.display_label.setText(
@@ -474,3 +490,62 @@ class MainWindow(QMainWindow):
     def start_server_delayed(self):
         if self.current_mode == "host":
             self.controller.start_host_mode()
+
+    def update_connection_quality(self, fps, ping_ms):
+ 
+        if fps >= 25 and ping_ms < 50:
+            quality = "Excellent"
+            color = "#4CAF50"
+            icon = "●"
+        elif fps >= 20 and ping_ms < 100:
+            quality = "Good"
+            color = "#8BC34A"
+            icon = "●"
+        elif fps >= 15 and ping_ms < 150:
+            quality = "Fair"
+            color = "#FF9800"
+            icon = "◐"
+        elif fps >= 10:
+            quality = "Poor"
+            color = "#FF5722"
+            icon = "◑"
+        else:
+            quality = "Bad"
+            color = "#F44336"
+            icon = "○"
+        
+        self.quality_indicator.setText(f"{icon} {quality}")
+        self.quality_indicator.setStyleSheet(f"QLabel {{ color: {color}; font-weight: bold; }}")
+
+    def keyPressEvent(self, event):
+        key = event.key()
+        modifiers = event.modifiers()
+
+        if (modifiers & Qt.ControlModifier) and key == Qt.Key_C: #ctrl or cmd c to copy the address
+            if self.current_mode == "host":
+                self.copy_address()
+                event.accept()
+                return
+        
+        elif (modifiers & Qt.ControlModifier) and key == Qt.Key_D: #ctrl or cmd d to disconnect
+            if self.current_mode == "viewer" and self.controller.client:
+                if self.controller.client.is_connected:
+                    self.on_disconnect_clicked()
+                    event.accept()
+                    return
+                
+        elif (modifiers & Qt.ControlModifier) and key == Qt.Key_R: #ctrl or cmd r to reconnect
+            if self.current_mode == "viewer":
+                address = self.address_input.text().strip()
+                if address:
+                    self.on_connect_clicked()
+                    event.accept()
+                    return
+                
+        elif key == Qt.Key_Escape:
+            if self.isFullScreen():
+                self.showNormal()
+                event.accept()
+                return
+            
+        super().keyPressEvent(event)
