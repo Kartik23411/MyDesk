@@ -29,7 +29,7 @@ class AsyncServer:
             self.ssl_context = ssl_helper.get_server_ssl_context()
         # Controller
         self.mouse_ctrl = MouseController()
-        self.keyboar_ctrl = KeyboardController()
+        self.keyboard_ctrl = KeyboardController()
         self.screen_capture = None
 
     async def start(self):

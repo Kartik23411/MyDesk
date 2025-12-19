@@ -11,6 +11,9 @@ from client.gui.pin_dialog import PinSetupDialog, PinVerifyDialog
 from common.config_manager import ConfigManager
 from PySide6.QtWidgets import QApplication
 from app.app_controller import AppController
+from client.input.mouse_handler import MouseHandler_Async
+from client.input.keyboard_handler import KeyboardHandler
+from client.utils.display import get_screen_size
 import asyncio
 
 class MainWindow(QMainWindow):
@@ -25,6 +28,9 @@ class MainWindow(QMainWindow):
         self.current_mode = "host"  # setting the host as default mode
         self.config_manager = None
         self.controller = None
+
+        self.mouse_handler = None
+        self.keyboard_handler = None
         self.setup_ui()
         
         # Connect signals
@@ -287,6 +293,13 @@ class MainWindow(QMainWindow):
         
     @Slot(np.ndarray)
     def update_frame(self, frame):
+
+        height, width = frame.shape[:2]
+
+        if self.mouse_handler:
+            display_w, display_h = get_screen_size()
+            self.mouse_handler.set_dimensions(width, height, display_w, display_h)
+
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         h, w, ch = rgb_frame.shape
         bytes_per_line = ch * w
@@ -433,11 +446,22 @@ class MainWindow(QMainWindow):
             self.connect_btn.setText("Disconnect")
             self.connect_btn.clicked.disconnect()
             self.connect_btn.clicked.connect(self.on_disconnect_clicked)
+
+            QTimer.singleShot(300, self.setup_input_handlers)
             
             self.status_bar.showMessage(f"Connected to {remote_addr}")
         
     def on_connection_lost(self):
+
+        print("DEBUG: Connection lost is called")
+
         self.update_connection_status("Disconnected", "#F44336")
+
+        if self.keyboard_handler:
+            self.keyboard_handler.stop()
+            self.keyboard_handler = None
+        
+        self.mouse_handler = None
 
         self.update_fps(0)
         self.update_ping(0)
@@ -616,4 +640,22 @@ class MainWindow(QMainWindow):
     def on_reconnect_clicked(self):
         self.on_connect_clicked()
 
-    
+    def setup_input_handlers(self):
+
+        if not self.controller.client or not self.controller: 
+            print("Cannot setup input handlers - no Client")
+            return
+        
+        mouse_callbacks = {
+            "mouse_move": self.controller.send_mouse_move,
+            "mouse_click": self.controller.send_mouse_click,
+            "scroll": self.controller.send_scroll,
+        }
+
+        self.mouse_handler = MouseHandler_Async(mouse_callbacks)  
+        self.keyboard_handler = KeyboardHandler(self.controller.send_key_press)
+        
+        self.keyboard_handler.start()
+        cv2.setMouseCallback("MyDesk - Remote Screen", self.mouse_handler.callback, None)
+
+        print("Input Handlers are connected")
