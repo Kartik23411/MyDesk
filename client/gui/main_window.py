@@ -3,8 +3,8 @@ from PySide6.QtWidgets import (
     QLabel, QPushButton, QLineEdit, QRadioButton,
     QButtonGroup, QFrame, QStatusBar, QMenuBar, QMenu, QMessageBox, QDialog
 )
-from PySide6.QtCore import Qt, Signal, Slot, QTimer
-from PySide6.QtGui import QImage, QPixmap, QAction, QFont, QKeySequence
+from PySide6.QtCore import Qt, Signal, Slot, QTimer, QEvent
+from PySide6.QtGui import QImage, QPixmap, QAction, QFont, QKeySequence, QMouseEvent, QWheelEvent
 import cv2
 import numpy as np
 from client.gui.pin_dialog import PinSetupDialog, PinVerifyDialog
@@ -208,6 +208,9 @@ class MainWindow(QMainWindow):
             "QLabel { background-color: black; color: white; font-size: 16px; }"
         )
         self.display_label.setText("Screen of host...")
+
+        # To enable the mouse tracking 
+        self.display_label.setMouseTracking(True)
         
         parent_layout.addWidget(self.display_label, 1)
 
@@ -457,11 +460,14 @@ class MainWindow(QMainWindow):
 
         self.update_connection_status("Disconnected", "#F44336")
 
+
+        if self.mouse_handler:
+            self.display_label.removeEventFilter(self)
+            self.mouse_handler = None
+
         if self.keyboard_handler:
             self.keyboard_handler.stop()
             self.keyboard_handler = None
-        
-        self.mouse_handler = None
 
         self.update_fps(0)
         self.update_ping(0)
@@ -656,6 +662,43 @@ class MainWindow(QMainWindow):
         self.keyboard_handler = KeyboardHandler(self.controller.send_key_press)
         
         self.keyboard_handler.start()
-        cv2.setMouseCallback("MyDesk - Remote Screen", self.mouse_handler.callback, None)
-
+        self.display_label.installEventFilter(self)
         print("Input Handlers are connected")
+
+    def eventFilter(self, obj, event):
+    
+        # Only handle events on display label when in viewer mode
+        if obj == self.display_label and self.current_mode == "viewer" and self.mouse_handler:
+            
+            if event.type() == QEvent.MouseMove:
+                self.mouse_handler.callback(cv2.EVENT_MOUSEMOVE, event.x(), event.y(), 0, None)
+                return True
+                
+            elif event.type() == QEvent.MouseButtonPress:
+                button = event.button()
+                if button == Qt.LeftButton:
+                    self.mouse_handler.callback(cv2.EVENT_LBUTTONDOWN, event.x(), event.y(), 0, None)
+                elif button == Qt.RightButton:
+                    self.mouse_handler.callback(cv2.EVENT_RBUTTONDOWN, event.x(), event.y(), 0, None)
+                elif button == Qt.MiddleButton:
+                    self.mouse_handler.callback(cv2.EVENT_MBUTTONDOWN, event.x(), event.y(), 0, None)
+                return True
+                
+            elif event.type() == QEvent.MouseButtonRelease:
+                button = event.button()
+                if button == Qt.LeftButton:
+                    self.mouse_handler.callback(cv2.EVENT_LBUTTONUP, event.x(), event.y(), 0, None)
+                elif button == Qt.RightButton:
+                    self.mouse_handler.callback(cv2.EVENT_RBUTTONUP, event.x(), event.y(), 0, None)
+                elif button == Qt.MiddleButton:
+                    self.mouse_handler.callback(cv2.EVENT_MBUTTONUP, event.x(), event.y(), 0, None)
+                return True
+                
+            elif event.type() == QEvent.Wheel:
+                delta = event.angleDelta().y()
+                flags = 1 if delta > 0 else -1
+                self.mouse_handler.callback(cv2.EVENT_MOUSEWHEEL, event.x(), event.y(), flags, None)
+                return True
+        
+        # Pass event to parent
+        return super().eventFilter(obj, event)
