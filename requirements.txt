@@ -2,6 +2,8 @@ annotated-doc==0.0.3
 annotated-types==0.7.0
 anyio==4.11.0
 bcrypt==5.0.0
+cffi==2.0.0
+cryptography==46.0.3
 evdev==1.9.2
 fastapi==0.120.2
 idna==3.11
@@ -9,6 +11,7 @@ mss==10.1.0
 numpy==2.2.6
 opencv-python==4.12.0.88
 pillow==12.0.0
+pycparser==2.23
 pydantic==2.12.3
 pydantic_core==2.41.4
 pynput==1.8.1
