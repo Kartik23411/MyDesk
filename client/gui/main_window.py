@@ -584,7 +584,25 @@ class MainWindow(QMainWindow):
     def keyPressEvent(self, event):
         key = event.key()
         modifiers = event.modifiers()
+        text = event.text()
 
+        if self.current_mode == "viewer" and self.controller and self.controller.client and self.controller.client.is_connected:
+            # forward only regular keys to the server not the modifier keys
+            if not (modifiers & (Qt.ControlModifier | Qt.AltModifier)):
+                if text:
+                    print(f"DEBUG: Sending key to server: {text}")
+                    self.controller.send_key_press(text)
+                    event.accept()
+                    return
+                else:
+                    key_name = self.get_special_key_name(key)
+                    if key_name:
+                        print(f"DEBUG: Sending special key: {key_name}")
+                        self.controller.send_key_press(key_name)
+                        event.accept()
+                        return
+
+        # To handle the app specific shortcuts
         if (modifiers & Qt.ControlModifier) and key == Qt.Key_C: #ctrl or cmd c to copy the address
             if self.current_mode == "host":
                 self.copy_address()
@@ -675,6 +693,11 @@ class MainWindow(QMainWindow):
     
         # Only handle events on display label when in viewer mode
         if obj == self.display_label and self.current_mode == "viewer" and self.mouse_handler:
+
+            # check for the type of the event 
+            event_type = event.type()
+            if event_type not in [QEvent.MouseMove, QEvent.MouseButtonPress, QEvent.MouseButtonRelease, QEvent.Wheel]:
+                return super().eventFilter(obj, event)
             
             if self.displayed_pixmap_size:
                 label_width = self.display_label.width()
@@ -685,45 +708,84 @@ class MainWindow(QMainWindow):
                 offset_x = (label_width - pixmap_width) // 2
                 offset_y = (label_height - pixmap_height) // 2
 
-                mouse_x = event.x() - offset_x
-                mouse_y = event.y() - offset_y
+                mouse_x = event.position().x() - offset_x
+                mouse_y = event.position().y() - offset_y
 
                 # Check if mouse is within the displayed pixmap area
                 if mouse_x < 0 or mouse_x >= pixmap_width or mouse_y < 0 or mouse_y >= pixmap_height:
                     return super().eventFilter(obj, event)
             else:
-                mouse_x = event.x()
-                mouse_y = event.y()
+                mouse_x = event.position().x()
+                mouse_y = event.position().y()
+
+            mouse_x = int(mouse_x)
+            mouse_y = int(mouse_y)
 
             if event.type() == QEvent.MouseMove:
-                self.mouse_handler.callback(cv2.EVENT_MOUSEMOVE, event.x(), event.y(), 0, None)
+                self.mouse_handler.callback(cv2.EVENT_MOUSEMOVE, mouse_x, mouse_y, 0, None)
                 return True
             
             elif event.type() == QEvent.MouseButtonPress:
                 button = event.button()
                 if button == Qt.LeftButton:
-                    self.mouse_handler.callback(cv2.EVENT_LBUTTONDOWN, event.x(), event.y(), 0, None)
+                    self.mouse_handler.callback(cv2.EVENT_LBUTTONDOWN, mouse_x, mouse_y, 0, None)
                 elif button == Qt.RightButton:
-                    self.mouse_handler.callback(cv2.EVENT_RBUTTONDOWN, event.x(), event.y(), 0, None)
+                    self.mouse_handler.callback(cv2.EVENT_RBUTTONDOWN, mouse_x, mouse_y, 0, None)
                 elif button == Qt.MiddleButton:
-                    self.mouse_handler.callback(cv2.EVENT_MBUTTONDOWN, event.x(), event.y(), 0, None)
+                    self.mouse_handler.callback(cv2.EVENT_MBUTTONDOWN, mouse_x, mouse_y, 0, None)
                 return True
             
             elif event.type() == QEvent.MouseButtonRelease:
                 button = event.button()
                 if button == Qt.LeftButton:
-                    self.mouse_handler.callback(cv2.EVENT_LBUTTONUP, event.x(), event.y(), 0, None)
+                    self.mouse_handler.callback(cv2.EVENT_LBUTTONUP, mouse_x, mouse_y, 0, None)
                 elif button == Qt.RightButton:
-                    self.mouse_handler.callback(cv2.EVENT_RBUTTONUP, event.x(), event.y(), 0, None)
+                    self.mouse_handler.callback(cv2.EVENT_RBUTTONUP, mouse_x, mouse_y, 0, None)
                 elif button == Qt.MiddleButton:
-                    self.mouse_handler.callback(cv2.EVENT_MBUTTONUP, event.x(), event.y(), 0, None)
+                    self.mouse_handler.callback(cv2.EVENT_MBUTTONUP, mouse_x, mouse_y, 0, None)
                 return True
             
             elif event.type() == QEvent.Wheel:
                 delta = event.angleDelta().y()
                 flags = 1 if delta > 0 else -1
-                self.mouse_handler.callback(cv2.EVENT_MOUSEWHEEL, event.x(), event.y(), flags, None)
+                self.mouse_handler.callback(cv2.EVENT_MOUSEWHEEL, mouse_x, mouse_y, flags, None)
                 return True
         
         # Pass event to parent
         return super().eventFilter(obj, event)
+    
+    def get_special_key_name(self, qt_key):
+        key_map = {
+            Qt.Key_Return: 'enter',
+            Qt.Key_Enter: 'enter',
+            Qt.Key_Backspace: 'backspace',
+            Qt.Key_Tab: 'tab',
+            Qt.Key_Space: 'space',
+            Qt.Key_Delete: 'delete',
+            Qt.Key_Escape: 'esc',
+            Qt.Key_Up: 'up',
+            Qt.Key_Down: 'down',
+            Qt.Key_Left: 'left',
+            Qt.Key_Right: 'right',
+            Qt.Key_Home: 'home',
+            Qt.Key_End: 'end',
+            Qt.Key_PageUp: 'page_up',
+            Qt.Key_PageDown: 'page_down',
+            Qt.Key_Shift: 'shift',
+            Qt.Key_Control: 'ctrl',
+            Qt.Key_Alt: 'alt',
+            Qt.Key_CapsLock: 'caps_lock',
+            Qt.Key_F1: 'f1',
+            Qt.Key_F2: 'f2',
+            Qt.Key_F3: 'f3',
+            Qt.Key_F4: 'f4',
+            Qt.Key_F5: 'f5',
+            Qt.Key_F6: 'f6',
+            Qt.Key_F7: 'f7',
+            Qt.Key_F8: 'f8',
+            Qt.Key_F9: 'f9',
+            Qt.Key_F10: 'f10',
+            Qt.Key_F11: 'f11',
+            Qt.Key_F12: 'f12',
+        }
+        return key_map.get(qt_key)
