@@ -9,18 +9,21 @@ class KeyboardHandler:
         self.listener = None
 
     def on_press(self, key):
+        print(f"DEBUG: Key pressed: {key}")  # ✅ Add this
+    
         try:
             key_char = key.char
         except AttributeError:
             key_char = key.name
 
         key_bytes = key_char.encode('utf-8')
-        payload = key_bytes
-
+        
+        print(f"DEBUG: Sending key: {key_char}")  # ✅ Add this
+        
         try:
-            send_message(self.socket ,MSG_KEY_PRESS, payload)
-        except:
-            pass
+            self.send_callback(key_char)
+        except Exception as e:
+            print(f"DEBUG: Error sending key: {e}")  # ✅ Add this
 
     def on_release(self, key):
         pass

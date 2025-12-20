@@ -31,6 +31,9 @@ class MainWindow(QMainWindow):
 
         self.mouse_handler = None
         self.keyboard_handler = None
+
+        # to get the size of display area where need to actual display
+        self.displayed_pixmap_size = None
         self.setup_ui()
         
         # Connect signals
@@ -299,10 +302,6 @@ class MainWindow(QMainWindow):
 
         height, width = frame.shape[:2]
 
-        if self.mouse_handler:
-            display_w, display_h = get_screen_size()
-            self.mouse_handler.set_dimensions(width, height, display_w, display_h)
-
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         h, w, ch = rgb_frame.shape
         bytes_per_line = ch * w
@@ -316,7 +315,14 @@ class MainWindow(QMainWindow):
             Qt.SmoothTransformation
         )
         
+        self.displayed_pixmap_size = scaled_pixmap.size()
         self.display_label.setPixmap(scaled_pixmap)
+
+        if self.mouse_handler:
+            self.mouse_handler.set_dimensions(
+                width, height,  # Server screen size
+                scaled_pixmap.width(), scaled_pixmap.height()  # client display window size
+            )
         
     def update_connection_status(self, status, color="#4CAF50"):
         self.connection_status.setText(f"Connection: {status}")
@@ -670,10 +676,29 @@ class MainWindow(QMainWindow):
         # Only handle events on display label when in viewer mode
         if obj == self.display_label and self.current_mode == "viewer" and self.mouse_handler:
             
+            if self.displayed_pixmap_size:
+                label_width = self.display_label.width()
+                label_height = self.display_label.height()
+                pixmap_width = self.displayed_pixmap_size.width()
+                pixmap_height = self.displayed_pixmap_size.height()
+
+                offset_x = (label_width - pixmap_width) // 2
+                offset_y = (label_height - pixmap_height) // 2
+
+                mouse_x = event.x() - offset_x
+                mouse_y = event.y() - offset_y
+
+                # Check if mouse is within the displayed pixmap area
+                if mouse_x < 0 or mouse_x >= pixmap_width or mouse_y < 0 or mouse_y >= pixmap_height:
+                    return super().eventFilter(obj, event)
+            else:
+                mouse_x = event.x()
+                mouse_y = event.y()
+
             if event.type() == QEvent.MouseMove:
                 self.mouse_handler.callback(cv2.EVENT_MOUSEMOVE, event.x(), event.y(), 0, None)
                 return True
-                
+            
             elif event.type() == QEvent.MouseButtonPress:
                 button = event.button()
                 if button == Qt.LeftButton:
@@ -683,7 +708,7 @@ class MainWindow(QMainWindow):
                 elif button == Qt.MiddleButton:
                     self.mouse_handler.callback(cv2.EVENT_MBUTTONDOWN, event.x(), event.y(), 0, None)
                 return True
-                
+            
             elif event.type() == QEvent.MouseButtonRelease:
                 button = event.button()
                 if button == Qt.LeftButton:
@@ -693,7 +718,7 @@ class MainWindow(QMainWindow):
                 elif button == Qt.MiddleButton:
                     self.mouse_handler.callback(cv2.EVENT_MBUTTONUP, event.x(), event.y(), 0, None)
                 return True
-                
+            
             elif event.type() == QEvent.Wheel:
                 delta = event.angleDelta().y()
                 flags = 1 if delta > 0 else -1
